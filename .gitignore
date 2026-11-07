@@ -1,0 +1,21 @@
+# 编译器产物
+*.exe
+*.pdb
+
+# 构建与运行产物
+/output/
+/output-*/
+/test-output/
+/smoke-*/
+/package/
+/release/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store

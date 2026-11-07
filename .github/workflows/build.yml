@@ -1,0 +1,88 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build-and-test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show toolchain
+        shell: cmd
+        run: |
+          echo %PROCESSOR_ARCHITECTURE%
+          dir "%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+
+      - name: Compile (csc / .NET Framework 4.x)
+        shell: cmd
+        run: build.cmd
+
+      - name: Self test (DSP + SSML + SAPI + MP3/M4A + batch)
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath ".\StationVoice.exe" -ArgumentList '--selftest','--out','test-output' -Wait -PassThru -NoNewWindow
+          if (Test-Path "test-output\selftest-report.txt") {
+            Get-Content "test-output\selftest-report.txt" -Encoding UTF8 | Write-Host
+          }
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "self test failed with exit code $($proc.ExitCode)"
+            exit 1
+          }
+
+      - name: CLI smoke test (mp3 / wav / m4a)
+        shell: pwsh
+        run: |
+          foreach ($fmt in @('mp3','wav','m4a')) {
+            $proc = Start-Process -FilePath ".\StationVoice.exe" `
+              -ArgumentList '--stops','templates/metro-stops.txt','--mode','metro','--line','地铁2号线','--terminal','浦东国际机场','--format',$fmt,'--out',"smoke-$fmt" `
+              -Wait -PassThru -NoNewWindow
+            if ($proc.ExitCode -ne 0) { Write-Error "CLI failed for $fmt"; exit 1 }
+          }
+          Get-ChildItem smoke-mp3 -File | Select-Object Name,Length | Format-Table | Out-String | Write-Host
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag.StartsWith('v')) { $tag = 'dev-' + $env:GITHUB_SHA.Substring(0,7) }
+          New-Item -ItemType Directory -Force -Path package, release | Out-Null
+          Copy-Item StationVoice.exe package\
+          Copy-Item README.md, LICENSE package\
+          Copy-Item -Recurse templates package\templates
+          if (Test-Path "test-output\batch") { Copy-Item -Recurse "test-output\batch" "package\demo-audio" }
+          if (Test-Path "smoke-mp3") { Copy-Item -Recurse "smoke-mp3" "package\demo-audio\metro-line" }
+          Compress-Archive -Path "package\*" -DestinationPath "release\StationVoice-$tag-portable.zip" -Force
+          Get-ChildItem release | Format-Table Name,Length | Out-String | Write-Host
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StationVoice-build
+          path: |
+            release/*.zip
+            test-output/selftest-report.txt
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: StationVoice ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: release/*.zip
+          draft: false
+          prerelease: false

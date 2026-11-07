@@ -1,0 +1,7 @@
+# 公交示例：站名|英文名|换乘线路
+火车站|Railway Station
+中山路|Zhongshan Road|2路,15路
+人民公园|People's Park
+文化宫|Cultural Palace
+市人民医院|City People's Hospital
+高新开发区|High-tech Development Zone

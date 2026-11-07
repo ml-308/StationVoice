@@ -1,0 +1,7 @@
+# 地铁示例：站名|英文名|换乘信息
+人民广场|People's Square|1号线
+南京东路|Nanjing East Road
+陆家嘴|Lujiazui|2号线
+世纪大道|Century Avenue|4号线
+龙阳路|Longyang Road|7号线
+浦东国际机场|Pudong International Airport
