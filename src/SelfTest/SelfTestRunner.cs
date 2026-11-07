@@ -17,6 +17,7 @@ namespace StationVoice.SelfTest
         private static int _fail;
         private static int _skip;
         private static bool _hasChinese;
+        private static bool _sapiOk;
 
         public static int Run(string outDir)
         {
@@ -31,12 +32,14 @@ namespace StationVoice.SelfTest
             Line("StationVoice 自测报告");
             Line("时间：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
             Line("系统：" + Environment.OSVersion.VersionString + "　CLR：" + Environment.Version);
-            List<string> voices = SafeVoices();
-            Line("系统音色：" + (voices.Count == 0 ? "(无)" : string.Join(" / ", voices.ToArray())));
+            List<VoiceEntry> voices = SafeVoices();
+            string voiceNames = "";
+            for (int i = 0; i < voices.Count; i++) voiceNames += (i > 0 ? " / " : "") + voices[i].Description;
+            Line("系统音色：" + (voices.Count == 0 ? "(无)" : voiceNames));
             bool hasChinese = false;
             for (int i = 0; i < voices.Count; i++)
             {
-                if (StationSynthesizer.IsChineseVoice(voices[i])) hasChinese = true;
+                if (voices[i].IsChinese) hasChinese = true;
             }
             Line("中文音色：" + (hasChinese ? "有" : "无（中文朗读相关用例将跳过）"));
             _hasChinese = hasChinese;
@@ -102,7 +105,7 @@ namespace StationVoice.SelfTest
             Report.AppendLine(text);
         }
 
-        private static List<string> SafeVoices()
+        private static List<VoiceEntry> SafeVoices()
         {
             try
             {
@@ -110,7 +113,7 @@ namespace StationVoice.SelfTest
             }
             catch (Exception)
             {
-                return new List<string>();
+                return new List<VoiceEntry>();
             }
         }
 
@@ -255,8 +258,8 @@ namespace StationVoice.SelfTest
             string path = Path.Combine(outDir, "sapi_speech.wav");
             using (SapiEngine engine = new SapiEngine())
             {
-                string voice = engine.SelectVoice("");
-                if (string.IsNullOrEmpty(voice))
+                VoiceEntry voice = engine.SelectVoice("");
+                if (voice == null)
                     throw new SkipException("系统没有可用的 SAPI 音色");
 
                 TimbreProfile p = new TimbreProfile();
@@ -269,7 +272,14 @@ namespace StationVoice.SelfTest
                 bool ssmlOk = engine.Render(ssml, Announcement.PlainText(lines), path, 44100, p.RatePct);
                 long size = new FileInfo(path).Length;
 
-                Line("       音色：" + voice + "　SSML 生效：" + (ssmlOk ? "是" : "否") + "　文件 " + (size / 1024) + " KB");
+                Line("       音色：" + voice.Description + "　SSML 生效：" + (ssmlOk ? "是" : "否") + "　文件 " + (size / 1024) + " KB");
+                if (!ssmlOk && size < 2000)
+                {
+                    _sapiOk = false;
+                    throw new SkipException("本机语音引擎无法渲染（" + engine.LastError + "）");
+                }
+                _sapiOk = true;
+
                 if (!hasChinese)
                     throw new SkipException("未安装中文音色，中文合成质量无法评估");
 
@@ -343,6 +353,11 @@ namespace StationVoice.SelfTest
             options.OutputDir = dir;
             options.Merge = true;
             options.KeepWav = true;
+            if (!_sapiOk)
+            {
+                options.MockSpeech = true;
+                Line("       语音引擎不可用，本条用例改用管道自检模式（合成音代替人声）");
+            }
 
             SynthResult result = StationSynthesizer.RenderStops(p, AnnounceMode.Metro, lineName, terminal, stops, options, null, null);
             Line("       生成 " + result.Files.Count + " 个分段，合集 " + (result.Merged != null ? "有" : "无"));

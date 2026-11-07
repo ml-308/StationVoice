@@ -325,7 +325,7 @@ namespace StationVoice.Ui
         private void LoadVoices()
         {
             _voice.Items.Clear();
-            List<string> voices;
+            List<VoiceEntry> voices;
             try
             {
                 voices = SapiEngine.InstalledVoices();
@@ -333,22 +333,23 @@ namespace StationVoice.Ui
             catch (Exception ex)
             {
                 AppendLog("读取系统音色失败：" + ex.Message);
-                voices = new List<string>();
+                voices = new List<VoiceEntry>();
             }
             for (int i = 0; i < voices.Count; i++) _voice.Items.Add(voices[i]);
             if (_voice.Items.Count > 0)
             {
                 int chineseIndex = 0;
-                for (int i = 0; i < _voice.Items.Count; i++)
+                for (int i = 0; i < voices.Count; i++)
                 {
-                    if (StationSynthesizer.IsChineseVoice(_voice.Items[i].ToString())) { chineseIndex = i; break; }
+                    if (voices[i].IsChinese) { chineseIndex = i; break; }
                 }
                 _voice.SelectedIndex = chineseIndex;
             }
             else
             {
-                _voice.Items.Add("(未检测到系统音色)");
+                _voice.Items.Add(new VoiceEntry());
                 _voice.SelectedIndex = 0;
+                AppendLog("未检测到系统音色：请在「设置 → 时间和语言 → 语音」中安装中文语音包。");
             }
         }
 
@@ -489,13 +490,16 @@ namespace StationVoice.Ui
                 string temp = Path.Combine(Path.GetTempPath(), "stationvoice_preview.wav");
                 using (SapiEngine engine = new SapiEngine())
                 {
-                    string voice = engine.SelectVoice(_voice.SelectedItem == null ? "" : _voice.SelectedItem.ToString());
+                    VoiceEntry selected = _voice.SelectedItem as VoiceEntry;
+                    VoiceEntry voice = engine.SelectVoice(selected == null ? "" : selected.Id);
+                    if (voice == null) throw new InvalidOperationException("系统没有可用的语音音色。");
+
                     AnnounceMode mode = _mode.SelectedIndex == 0 ? AnnounceMode.Bus : AnnounceMode.Metro;
                     List<ScriptLine> lines = Announcement.Build(mode, _line.Text.Trim(), _terminal.Text.Trim(), stops[0],
                         stops.Count > 1 ? stops[1] : null, _english.Checked, true);
                     string ssml = SsmlBuilder.Build(_profile, "", lines);
                     engine.Render(ssml, Announcement.PlainText(lines), temp, 44100, _profile.RatePct);
-                    AppendLog("试听音色：" + voice);
+                    AppendLog("试听音色：" + voice.Description);
                 }
 
                 if (_player != null) { _player.Stop(); _player.Dispose(); }
@@ -613,7 +617,8 @@ namespace StationVoice.Ui
             else if (_format.SelectedIndex == 2) options.Format = AudioFormat.M4a;
             else options.Format = AudioFormat.Mp3;
 
-            options.VoiceName = _voice.SelectedItem == null ? "" : _voice.SelectedItem.ToString();
+            VoiceEntry selected = _voice.SelectedItem as VoiceEntry;
+            options.VoiceName = selected == null ? "" : selected.Id;
             options.OutputDir = string.IsNullOrEmpty(_outDir.Text.Trim())
                 ? Path.Combine(Application.StartupPath, "output")
                 : _outDir.Text.Trim();

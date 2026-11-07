@@ -1,14 +1,19 @@
-# 编译器产物
+# 构建产物
 *.exe
 *.pdb
+/bin/
+/obj/
 
-# 构建与运行产物
+# 运行产物
 /output/
 /output-*/
 /test-output/
+/test-output-*/
+/verify-*/
 /smoke-*/
 /package/
 /release/
+/mfprobe_probe.*
 
 # IDE
 .vs/

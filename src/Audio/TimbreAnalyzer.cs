@@ -107,7 +107,7 @@ namespace StationVoice.Audio
             {
                 p.MatchedPreset = "未检测到有效人声";
                 p.Confidence = 0;
-                p.Centroid = Dsp.Mean(centrums);
+                p.Centroid = Dsp.Mean(centrums.ToArray());
                 p.LoudnessDbfs = ToDbfs(Dsp.Mean(frameRaw));
                 return p;
             }
@@ -132,7 +132,7 @@ namespace StationVoice.Audio
             }
 
             double voicedSeconds = voicedFrames * HopLength / (double)AnalysisRate;
-            List<int> peaks = Dsp.EnvelopePeaks(mono, AnalysisRate, 20, 90, 0.18);
+            List<int> peaks = Dsp.EnvelopePeaks(mono, AnalysisRate, 25, 130, 0.28);
             if (voicedSeconds > 0.2 && peaks.Count > 0)
                 p.SpeakingRate = peaks.Count / voicedSeconds;
             else

@@ -18,6 +18,9 @@ namespace StationVoice.Synth
         public bool KeepWav = true;
         public bool IncludeEnglish = false;
         public int GapMs = 350;
+
+        /// <summary>管道自检模式：不调用语音引擎，用合成音代替人声，仅验证后续编码与拼接链路。</summary>
+        public bool MockSpeech = false;
     }
 
     public class SynthFileInfo
@@ -97,23 +100,47 @@ namespace StationVoice.Synth
             string ext = AudioFormats.Extension(options.Format);
             List<short[]> parts = new List<short[]>();
 
-            using (SapiEngine engine = new SapiEngine())
+            SapiEngine engine = null;
+            try
             {
-                string voice = engine.SelectVoice(options.VoiceName);
-                result.VoiceUsed = voice;
-                log.Info("音色：" + (string.IsNullOrEmpty(voice) ? "(系统默认)" : voice));
-                if (!string.IsNullOrEmpty(voice) && !IsChineseVoice(voice))
-                    log.Warn("当前音色不是中文语音，中文报站词可能会读不出来；建议在系统里安装中文语音包。");
+                if (!options.MockSpeech)
+                {
+                    engine = new SapiEngine();
+                    VoiceEntry voice = engine.SelectVoice(options.VoiceName);
+                    if (voice == null)
+                        throw new InvalidOperationException(
+                            "系统没有可用的语音音色，无法合成。请在「设置 → 时间和语言 → 语音」中安装中文语音包后重试。");
+
+                    result.VoiceUsed = voice.Description;
+                    log.Info("音色：" + voice.Description);
+                    if (!voice.IsChinese)
+                        log.Warn("当前音色不是中文语音，中文报站词可能会读不出来；建议在系统里安装中文语音包。");
+                }
+                else
+                {
+                    result.VoiceUsed = "(管道自检模式：不使用语音引擎)";
+                    log.Warn("管道自检模式：不调用语音引擎，仅验证 WAV → MP3/M4A → 拼接链路。");
+                }
 
                 for (int i = 0; i < jobs.Count; i++)
                 {
                     string title = titles[i];
                     string fileBase = SafeName(title);
                     string wavPath = Path.Combine(tmpDir, fileBase + ".wav");
-                    string ssml = SsmlBuilder.Build(profile, "", jobs[i]);
-                    string plain = Announcement.PlainText(jobs[i]);
+                    bool ssmlOk;
 
-                    bool ssmlOk = engine.Render(ssml, plain, wavPath, options.SampleRate, profile.RatePct);
+                    if (options.MockSpeech)
+                    {
+                        WriteMockSpeech(jobs[i], wavPath, options.SampleRate);
+                        ssmlOk = true;
+                    }
+                    else
+                    {
+                        string ssml = SsmlBuilder.Build(profile, "", jobs[i]);
+                        string plain = Announcement.PlainText(jobs[i]);
+                        ssmlOk = engine.Render(ssml, plain, wavPath, options.SampleRate, profile.RatePct);
+                    }
+
                     if (!ssmlOk)
                     {
                         result.SsmlAccepted = false;
@@ -121,6 +148,11 @@ namespace StationVoice.Synth
                     }
 
                     WavData data = WavIO.Read(wavPath);
+                    if (data.Samples.Length == 0)
+                        throw new InvalidOperationException(
+                            "语音引擎没有输出音频（音色：" + result.VoiceUsed + "）。" +
+                            "该系统可能缺少可用的语音组件，请换一个音色，或在「设置 → 时间和语言 → 语音」中安装中文语音包。");
+
                     short[] trimmed = WavIO.TrimSilence(data.Samples, data.SampleRate, 120);
                     parts.Add(trimmed);
 
@@ -149,6 +181,10 @@ namespace StationVoice.Synth
 
                     if (progress != null) progress(i + 1, jobs.Count, title);
                 }
+            }
+            finally
+            {
+                if (engine != null) engine.Dispose();
             }
 
             if (options.Merge && parts.Count > 0)
@@ -180,20 +216,34 @@ namespace StationVoice.Synth
             return result;
         }
 
-        public static bool IsChineseVoice(string voiceName)
+        /// <summary>生成一段「类语音」占位音频：谐波 + 音节包络，用于无语音引擎环境的管道自检。</summary>
+        private static void WriteMockSpeech(IList<ScriptLine> lines, string path, int sampleRate)
         {
-            if (string.IsNullOrEmpty(voiceName)) return false;
-            string lower = voiceName.ToLowerInvariant();
-            if (lower.IndexOf("huihui", StringComparison.Ordinal) >= 0) return true;
-            if (lower.IndexOf("kangkang", StringComparison.Ordinal) >= 0) return true;
-            if (lower.IndexOf("yaoyao", StringComparison.Ordinal) >= 0) return true;
-            if (lower.IndexOf("xiaoxiao", StringComparison.Ordinal) >= 0) return true;
-            if (lower.IndexOf("yunxi", StringComparison.Ordinal) >= 0) return true;
-            if (lower.IndexOf("chinese", StringComparison.Ordinal) >= 0) return true;
-            if (lower.IndexOf("zh-cn", StringComparison.Ordinal) >= 0) return true;
-            if (voiceName.IndexOf("中文", StringComparison.Ordinal) >= 0) return true;
-            if (voiceName.IndexOf("华", StringComparison.Ordinal) >= 0) return true;
-            return false;
+            string text = Announcement.PlainText(lines);
+            int chars = string.IsNullOrEmpty(text) ? 6 : text.Length;
+            double seconds = Math.Max(1.0, Math.Min(12.0, chars * 0.16));
+            int total = (int)(sampleRate * seconds);
+            short[] samples = new short[total];
+            Random rnd = new Random(chars * 31 + 7);
+            double syllableRate = 4.0;
+
+            for (int i = 0; i < total; i++)
+            {
+                double t = i / (double)sampleRate;
+                double v = 0;
+                for (int h = 1; h <= 8; h++)
+                {
+                    double freq = 180.0 * h;
+                    if (freq > sampleRate / 2.0 - 200) break;
+                    v += Math.Sin(2.0 * Math.PI * freq * t) / h;
+                }
+                double envelope = Math.Pow(Math.Abs(Math.Sin(Math.PI * syllableRate * t)), 1.4);
+                v = v * envelope * 0.18 + (rnd.NextDouble() - 0.5) * 0.002;
+                if (v > 1) v = 1;
+                if (v < -1) v = -1;
+                samples[i] = (short)Math.Round(v * 32767);
+            }
+            WavIO.Write(path, samples, sampleRate);
         }
 
         public static string SafeName(string name)

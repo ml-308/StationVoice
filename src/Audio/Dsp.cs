@@ -233,20 +233,40 @@ namespace StationVoice.Audio
             }
             if (maxEnv <= 1e-6) return peaks;
 
-            double thr = maxEnv * thresholdRatio;
+            // 平滑包络，避免谐波纹波被误判成音节
+            double[] smooth = new double[frames];
+            for (int i = 0; i < frames; i++)
+            {
+                double sum = 0;
+                int count = 0;
+                for (int k = -2; k <= 2; k++)
+                {
+                    int idx = i + k;
+                    if (idx < 0 || idx >= frames) continue;
+                    sum += env[idx];
+                    count++;
+                }
+                smooth[i] = count > 0 ? sum / count : env[i];
+            }
+
+            double smoothMax = 0;
+            for (int i = 0; i < frames; i++) if (smooth[i] > smoothMax) smoothMax = smooth[i];
+            if (smoothMax <= 1e-6) return peaks;
+
+            double thr = smoothMax * thresholdRatio;
             int minDist = Math.Max(1, minDistanceMs / Math.Max(1, windowMs));
 
             int lastPeak = -minDist;
             for (int i = 1; i < frames - 1; i++)
             {
-                if (env[i] >= thr && env[i] >= env[i - 1] && env[i] > env[i + 1])
+                if (smooth[i] >= thr && smooth[i] >= smooth[i - 1] && smooth[i] > smooth[i + 1])
                 {
                     if (i - lastPeak >= minDist)
                     {
                         peaks.Add(i * win + win / 2);
                         lastPeak = i;
                     }
-                    else if (peaks.Count > 0 && env[i] > env[peaks[peaks.Count - 1] / win])
+                    else if (peaks.Count > 0 && smooth[i] > smooth[peaks[peaks.Count - 1] / win])
                     {
                         peaks[peaks.Count - 1] = i * win + win / 2;
                         lastPeak = i;

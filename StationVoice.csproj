@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>StationVoice</AssemblyName>
+    <RootNamespace>StationVoice</RootNamespace>
+    <!-- 与 build.cmd 使用的 csc 4.0（C# 5）保持一致，避免本地通过、CI 失败 -->
+    <LangVersion>5</LangVersion>
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Product>StationVoice</Product>
+    <AssemblyTitle>StationVoice 报站声色模仿器</AssemblyTitle>
+    <Company>ml-308</Company>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Copyright>MIT License © 2026 ml-308</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Speech" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+
+</Project>

@@ -53,6 +53,24 @@ namespace StationVoice.Cli
                 if (!string.IsNullOrEmpty(save)) File.WriteAllText(save, p.ToJson(), Encoding.UTF8);
                 return 0;
             }
+            if (Has(opts, "voices"))
+            {
+                try
+                {
+                    List<VoiceEntry> list = SapiEngine.InstalledVoices();
+                    Console.WriteLine("系统可用音色（共 " + list.Count + " 个）：");
+                    for (int i = 0; i < list.Count; i++)
+                        Console.WriteLine("  " + list[i].Description + (list[i].IsChinese ? "  [中文]" : ""));
+                    Console.WriteLine("音色 Id（可用于 --voice）：");
+                    for (int i = 0; i < list.Count; i++) Console.WriteLine("  " + list[i].Id);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("枚举音色失败：" + ex.GetType().Name + " - " + ex.Message);
+                    return 1;
+                }
+                return 0;
+            }
             if (Has(opts, "presets"))
             {
                 Console.WriteLine("可用风格预置：");
@@ -63,6 +81,53 @@ namespace StationVoice.Cli
                         "  {0}　F0≈{1:0}Hz　语速{2:+0;-0;0}%　音调{3:+0;-0;0}%　停顿{4}ms　{5}",
                         ps.Name, ps.F0, ps.RatePct, ps.PitchPct, ps.PauseMs, ps.Memo));
                 }
+                return 0;
+            }
+            if (Has(opts, "ttsprobe"))
+            {
+                using (SapiEngine engine = new SapiEngine())
+                {
+                    VoiceEntry v = engine.SelectVoice(Get(opts, "voice", ""));
+                    Console.WriteLine("音色：" + (v == null ? "(无)" : v.Description));
+                    Console.WriteLine(engine.Probe(Path.Combine(Environment.CurrentDirectory, "tts_probe.wav")));
+                }
+                return 0;
+            }
+            if (Has(opts, "ttsdebug"))
+            {
+                string path = Path.Combine(Environment.CurrentDirectory, "tts_debug.wav");
+                try
+                {
+                    using (SapiEngine engine = new SapiEngine())
+                    {
+                        VoiceEntry v = engine.SelectVoice(Get(opts, "voice", ""));
+                        Console.WriteLine("音色：" + (v == null ? "(无)" : v.Description));
+                        if (v == null) return 1;
+
+                        string ssml = "<?xml version=\"1.0\"?><speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\">" +
+                                      "<prosody rate=\"-10%\">下一站，人民广场。</prosody></speak>";
+                        string plain = "下一站，人民广场。";
+
+                        bool ok0 = engine.Render(ssml, plain, path, 0, 0);
+                        Console.WriteLine("默认格式：SSML=" + ok0 + " 文件=" + new FileInfo(path).Length + " B  err=" + engine.LastError);
+
+                        bool ok1 = engine.Render(ssml, plain, path, 44100, 0);
+                        Console.WriteLine("44.1k 格式：SSML=" + ok1 + " 文件=" + new FileInfo(path).Length + " B  err=" + engine.LastError);
+
+                        bool ok2 = engine.Render(ssml, plain, path, 22050, 0);
+                        Console.WriteLine("22.05k 格式：SSML=" + ok2 + " 文件=" + new FileInfo(path).Length + " B  err=" + engine.LastError);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("异常：" + ex);
+                    return 1;
+                }
+                return 0;
+            }
+            if (Has(opts, "mfdebug"))
+            {
+                Console.WriteLine(MfTranscoder.DebugProbe(44100));
                 return 0;
             }
             if (Has(opts, "stops"))
