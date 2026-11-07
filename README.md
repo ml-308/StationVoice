@@ -129,8 +129,18 @@ build.cmd
 - `-codepage:65001`：源码 UTF-8，保证中文字符串正确。
 - `System.Speech` 从引用程序集目录解析（脚本会自动探测 v4.8 / v4.6.2 / v4.5）。
 
-CI 在 GitHub Actions 的 `windows-latest` 上执行：编译 → 10 项自测 → MP3/WAV/M4A 三种格式的 CLI 冒烟 → 打包 zip；
-推送 `v*` 标签时自动创建 GitHub Release 并附上便携包。
+### 云端构建（可选）
+
+仓库里的 `ci/build.yml` 是完整的 GitHub Actions 流水线：编译 → 10 项自测 → MP3/WAV/M4A 三种格式的 CLI 冒烟 →
+打包 zip → 推送 `v*` 标签时自动创建 Release。
+
+它没有放在 `.github/workflows/` 下，是因为向该目录推送文件需要令牌具备 `workflow` 权限。补权限后随时启用：
+
+```bash
+gh auth refresh -h github.com -s workflow
+mkdir -p .github/workflows && git mv ci/build.yml .github/workflows/build.yml
+git commit -m "ci: enable workflow" && git push
+```
 
 ---
 
@@ -156,7 +166,7 @@ StationVoice/
 │  ├─ SelfTest/SelfTestRunner.cs  自测
 │  └─ Ui/                         WinForms 界面
 ├─ templates/                     示例站点文件
-└─ .github/workflows/build.yml    CI + 自动 Release
+└─ ci/build.yml                   CI 流水线定义（改为 .github/workflows/build.yml 即启用）
 ```
 
 ---

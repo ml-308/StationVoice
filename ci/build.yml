@@ -1,3 +1,19 @@
+# StationVoice · GitHub Actions 构建流水线
+#
+# 说明：GitHub 要求 OAuth App 令牌具备 `workflow` 权限才能向 .github/workflows/ 推送文件。
+# 如果你的令牌没有该权限，请先在本地执行：
+#     gh auth refresh -h github.com -s workflow
+# 然后把这个文件移动回工作流目录：
+#     mkdir -p .github/workflows && git mv ci/build.yml .github/workflows/build.yml
+# 之后 push 到 main 或推送 v* 标签即可自动编译、自测、打包并发布 Release。
+#
+# 流水线内容：
+#   1. build.cmd 编译（.NET Framework csc，零依赖）
+#   2. StationVoice.exe --selftest 跑 10 项端到端自测
+#   3. CLI 冒烟：mp3 / wav / m4a 三种格式各跑一遍整线
+#   4. 打包便携 zip 并上传 artifact
+#   5. 推送 v* 标签时创建 GitHub Release 并附上 zip
+
 name: build
 
 on:
