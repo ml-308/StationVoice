@@ -15,6 +15,11 @@ namespace StationVoice
         [STAThread]
         private static int Main(string[] args)
         {
+            // 「发现新版本」检查：命令行开关 + 无人值守 probe（先于 CLI 判定，避免被当成非法参数）
+            UpdateKit.UpdateCheck.Configure(args);
+            int? probeExit = UpdateKit.UpdateCheck.TryProbe(args);
+            if (probeExit.HasValue) return probeExit.Value;
+
             if (Cli.CliRunner.LooksLikeCli(args))
             {
                 try
@@ -39,7 +44,9 @@ namespace StationVoice
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            MainForm form = new MainForm();
+            UpdateKit.UpdatePrompt.ScheduleAutoCheck(form);
+            Application.Run(form);
             return 0;
         }
     }

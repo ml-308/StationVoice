@@ -1,11 +1,11 @@
 ﻿; 报站声色模仿器 StationVoice · 安装程序（Inno Setup 6）
 ; 页面结构与选项由 common.iss 统一提供；这里只声明应用身份与要安装的文件。
-; 构建：installer\build-setup.cmd   产物：dist\StationVoice-Setup-1.1.0.exe
+; 构建：installer\build-setup.cmd   产物：dist\StationVoice-Setup-1.2.0.exe
 
 #define AppName "报站声色模仿器"
 #define AppSlug "StationVoice"
 #define DirName "StationVoice"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppId "{{6DBF4A58-9EC7-4C6D-D145-7FC20E8DB069}"
 #define AppExe "StationVoice.exe"
 #define AppRepo "StationVoice"

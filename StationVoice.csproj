@@ -16,9 +16,9 @@
     <Product>StationVoice</Product>
     <AssemblyTitle>StationVoice 报站声色模仿器</AssemblyTitle>
     <Company>ml-308</Company>
-    <Version>1.0.0</Version>
-    <FileVersion>1.0.0.0</FileVersion>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
     <Copyright>MIT License © 2026 ml-308</Copyright>
   </PropertyGroup>
 
